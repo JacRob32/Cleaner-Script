@@ -8,7 +8,7 @@ Sorts files in a folder into subfolders by type — images, videos, documents, c
 |---|---|
 | `FileOrganizer.command` | The core script. Sorts files into categorized subfolders. Can be run manually, via cron, or through the scheduler. |
 | `CleanupScheduler.command` | GUI setup tool. Lets you pick a folder and schedule, then writes a config file and installs the cron job for you. |
-| `Fileorganizeronetime.command` | One-shot organizer. Run it, pick a folder, done. No config, no scheduling. |
+| `FileOrganizerOneTime.command` | One-shot organizer. Run it, pick a folder, done. No config, no scheduling. |
 
 ## Installation
 
@@ -40,10 +40,10 @@ Alternatively, you can clear the quarantine flag from the terminal:
 ```
 xattr -d com.apple.quarantine FileOrganizer.command
 xattr -d com.apple.quarantine CleanupScheduler.command
-xattr -d com.apple.quarantine Fileorganizeronetime.command
+xattr -d com.apple.quarantine FileOrganizerOneTime.command
 ```
 
-## Using Fileorganizeronetime.command
+## Using FileOrganizerOneTime.command
 
 For a one-off cleanup. Double-click it, pick a folder from the Finder dialog, and it sorts everything in that folder into subfolders by type. No setup, no config files.
 
