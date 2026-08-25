@@ -1,5 +1,5 @@
 #!/bin/bash
-# FileOrganizer.sh — Sorts files into folders by type
+# FileOrganizer.command — Sorts files into folders by type 
 # Compatible with macOS default bash 3.2+
 # Works standalone or wrapped with Platypus
 
