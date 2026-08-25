@@ -1,54 +1,11 @@
 #!/bin/bash
-# FileOrganizer.command — Sorts files into folders by type
+# FileOrganizer.sh — Sorts files into folders by type
 # Compatible with macOS default bash 3.2+
-# Works standalone, wrapped with Platypus, or scheduled via cron
-#
-# Directory resolution priority:
-#   1. ORGANIZE_DIR environment variable
-#   2. CLI argument ($1)
-#   3. DIRECTORY in ~/.fileorganizer.conf
-#   4. GUI folder picker (unless SILENT=true)
+# Works standalone or wrapped with Platypus
 
-# ─── Configuration ───────────────────────────────────────────────────────────
-CONFIG_FILE="$HOME/.fileorganizer.conf"
-SILENT=false
-LOG_FILE="$HOME/.fileorganizer.log"
-DIRECTORY=""
-
-# Parse config file safely (only accept known keys)
-if [ -f "$CONFIG_FILE" ]; then
-    while IFS= read -r line; do
-        case "$line" in
-            \#*|"") continue ;;
-        esac
-        key="${line%%=*}"
-        value="${line#*=}"
-        case "$key" in
-            DIRECTORY)  DIRECTORY="$value" ;;
-            SILENT)     SILENT="$value" ;;
-            LOG_FILE)   LOG_FILE="$value" ;;
-        esac
-    done < "$CONFIG_FILE"
-fi
-
-# Logging helper — always prints to stdout; also writes to log in silent mode
-log_msg() {
-    echo "$1"
-    if [ "$SILENT" = "true" ]; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG_FILE"
-    fi
-}
-
-# ─── Directory resolution ────────────────────────────────────────────────────
-if [ -n "${ORGANIZE_DIR:-}" ] && [ -d "$ORGANIZE_DIR" ]; then
-    TARGET_DIR="$ORGANIZE_DIR"
-elif [ $# -ge 1 ] && [ -d "$1" ]; then
+# ─── Folder picker ───────────────────────────────────────────────────────────
+if [ $# -ge 1 ] && [ -d "$1" ]; then
     TARGET_DIR="$1"
-elif [ -n "$DIRECTORY" ] && [ -d "$DIRECTORY" ]; then
-    TARGET_DIR="$DIRECTORY"
-elif [ "$SILENT" = "true" ]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') Error: No directory configured. Set DIRECTORY in $CONFIG_FILE" >> "$LOG_FILE"
-    exit 1
 else
     TARGET_DIR=$(osascript -e '
         tell application "Finder"
@@ -65,16 +22,12 @@ fi
 TARGET_DIR="${TARGET_DIR%/}"
 
 if [ ! -d "$TARGET_DIR" ]; then
-    log_msg "Error: Invalid directory: $TARGET_DIR"
-    if [ "$SILENT" != "true" ]; then
-        osascript -e "display dialog \"Invalid directory.\" buttons {\"OK\"} default button \"OK\" with icon stop" 2>/dev/null
-    fi
+    osascript -e "display dialog \"Invalid directory.\" buttons {\"OK\"} default button \"OK\" with icon stop" 2>/dev/null
     exit 1
 fi
 
-log_msg "Organizing: $TARGET_DIR"
-
 # ─── Category lookup ─────────────────────────────────────────────────────────
+# Returns folder name for a given extension (lowercased via tr)
 get_category() {
     local ext
     ext=$(echo "$1" | tr '[:upper:]' '[:lower:]')
@@ -114,6 +67,7 @@ get_category() {
 
 # ─── Main logic ──────────────────────────────────────────────────────────────
 moved=0
+summary=""
 
 for filepath in "$TARGET_DIR"/*; do
     [ -e "$filepath" ] || continue
@@ -164,37 +118,27 @@ for filepath in "$TARGET_DIR"/*; do
     mv "$filepath" "$dest"
     moved=$((moved + 1))
 
-    log_msg "Moved: $filename → $category/"
+    # Platypus progress (shown in progress bar if configured)
+    echo "Moved: $filename → $category/"
 done
 
-# ─── Summary ─────────────────────────────────────────────────────────────────
+# ─── Summary dialog ──────────────────────────────────────────────────────────
 if [ "$moved" -eq 0 ]; then
-    log_msg "No files found to organize in $TARGET_DIR"
-    if [ "$SILENT" != "true" ]; then
-        osascript -e "display dialog \"No files found to organize.\" buttons {\"OK\"} default button \"OK\" with icon note" 2>/dev/null
-    fi
+    osascript -e "display dialog \"No files found to organize.\" buttons {\"OK\"} default button \"OK\" with icon note" 2>/dev/null
     exit 0
 fi
 
-# Build summary of category counts
+# Build a clean summary of what was created
 summary_lines=""
 for dir in "$TARGET_DIR"/*/; do
     [ -d "$dir" ] || continue
-    dname=$(basename "$dir")
+    dirname=$(basename "$dir")
     count=$(find "$dir" -maxdepth 1 -type f | wc -l | tr -d ' ')
     if [ "$count" -gt 0 ]; then
-        summary_lines="${summary_lines}${dname}: ${count} file(s)\n"
+        summary_lines="${summary_lines}${dirname}: ${count} file(s)\n"
     fi
 done
 
-log_msg "Organized $moved file(s) in $TARGET_DIR"
-
-if [ "$SILENT" = "true" ]; then
-    log_msg "--- Summary ---"
-    # Write summary to log (echo -e for newlines)
-    echo "$(date '+%Y-%m-%d %H:%M:%S') $(echo -e "$summary_lines")" >> "$LOG_FILE"
-else
-    osascript -e "display dialog \"Organized $moved file(s):\n\n$summary_lines\" buttons {\"Done\"} default button \"Done\" with icon note" 2>/dev/null
-fi
+osascript -e "display dialog \"Organized $moved file(s):\n\n$summary_lines\" buttons {\"Done\"} default button \"Done\" with icon note" 2>/dev/null
 
 exit 0
